@@ -19,6 +19,7 @@ package clientv3
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"sync"
 	"time"
@@ -50,17 +51,24 @@ func (c *Client) unaryClientInterceptor(optFuncs ...retryOption) grpc.UnaryClien
 			if err := waitRetryBackoff(ctx, attempt, callOpts); err != nil {
 				return err
 			}
-			c.GetLogger().Debug(
-				"retrying of unary invoker",
+			c.GetLogger().Warn(
+				"GM1 retrying of unary invoker",
 				zap.String("target", cc.Target()),
 				zap.Uint("attempt", attempt),
 			)
 			lastErr = invoker(ctx, method, req, reply, cc, grpcOpts...)
+			c.GetLogger().Warn(
+				"GM10 invoker result",
+				zap.String("method", method),
+				zap.String("req", fmt.Sprintf("%v", req)),
+				zap.Error(lastErr),
+			)
 			if lastErr == nil {
+				c.GetLogger().Warn("GM20 invoker result", zap.Error(lastErr))
 				return nil
 			}
 			c.GetLogger().Warn(
-				"retrying of unary invoker failed",
+				"GM30 retrying of unary invoker failed",
 				zap.String("target", cc.Target()),
 				zap.Uint("attempt", attempt),
 				zap.Error(lastErr),
@@ -68,33 +76,44 @@ func (c *Client) unaryClientInterceptor(optFuncs ...retryOption) grpc.UnaryClien
 			if isContextError(lastErr) {
 				if ctx.Err() != nil {
 					// its the context deadline or cancellation.
+					c.GetLogger().Warn("GM40 isContextError", zap.Error(lastErr))
 					return lastErr
 				}
 				// its the callCtx deadline or cancellation, in which case try again.
+				c.GetLogger().Warn("GM50 continue")
 				continue
 			}
 			if c.shouldRefreshToken(lastErr, callOpts) {
+				c.GetLogger().Warn("GM60 shouldRefreshToken")
 				// clear auth token before refreshing it.
 				// call c.Auth.Authenticate with an invalid token will always fail the auth check on the server-side,
 				// if the server has not apply the patch of pr #12165 (https://github.com/etcd-io/etcd/pull/12165)
 				// and a rpctypes.ErrInvalidAuthToken will recursively call c.getToken until system run out of resource.
 				c.authTokenBundle.UpdateAuthToken("")
+				c.GetLogger().Warn("GM70 UpdateAuthToken to one")
 
 				gterr := c.getToken(ctx)
+				c.GetLogger().Warn("GM80 getToken Err=", zap.Error(gterr))
+				mm, newErr := c.authTokenBundle.PerRPCCredentials().GetRequestMetadata(context.Background())
+				c.GetLogger().Warn("GM90 getToken token", zap.String("map", fmt.Sprintf("%v", mm)), zap.Error(newErr))
 				if gterr != nil {
 					c.GetLogger().Warn(
-						"retrying of unary invoker failed to fetch new auth token",
+						"GM100 retrying of unary invoker failed to fetch new auth token",
 						zap.String("target", cc.Target()),
 						zap.Error(gterr),
 					)
 					return gterr // lastErr must be invalid auth token
 				}
+				c.GetLogger().Warn("GM110 continue")
 				continue
 			}
 			if !isSafeRetry(c.lg, lastErr, callOpts) {
+				c.GetLogger().Warn("GM120 not isSafeRetry")
 				return lastErr
 			}
+			c.GetLogger().Warn("GM130 isSafeRetry true")
 		}
+		c.GetLogger().Warn("GM140 lastErr", zap.Error(lastErr))
 		return lastErr
 	}
 }
