@@ -64,7 +64,7 @@ func (c *Client) unaryClientInterceptor(optFuncs ...retryOption) grpc.UnaryClien
 				zap.Error(lastErr),
 			)
 			if lastErr == nil {
-				c.GetLogger().Warn("GM20 invoker result", zap.Error(lastErr))
+				c.GetLogger().Warn("GM20 invoker success and return", zap.Error(lastErr))
 				return nil
 			}
 			c.GetLogger().Warn(

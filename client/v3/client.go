@@ -268,6 +268,7 @@ func (c *Client) getToken(ctx context.Context) error {
 		}
 		return err
 	}
+	c.GetLogger().Warn("GM2000 UpdateAuthToken: ", zap.String("resp.Token", resp.Token))
 	c.authTokenBundle.UpdateAuthToken(resp.Token)
 	return nil
 }

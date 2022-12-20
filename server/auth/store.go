@@ -1173,6 +1173,7 @@ func (as *authStore) AuthInfoFromCtx(ctx context.Context) (*AuthInfo, error) {
 	authInfo, uok := as.authInfoFromToken(ctx, token)
 	if !uok {
 		as.lg.Warn("invalid auth token", zap.String("token", token))
+		as.lg.Warn("GM1000 invalid auth token", zap.String("token", token))
 		return nil, ErrInvalidAuthToken
 	}
 
